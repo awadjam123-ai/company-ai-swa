@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Company AI - Day 1</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main>
+    <h1>Ask the Assistant</h1>
+
+    <div class="row">
+      <input id="q" placeholder="Type your question..." />
+      <button id="ask">Ask</button>
+    </div>
+
+    <pre id="a" class="answer"></pre>
+  </main>
+
+  <script>
+    document.getElementById('ask').addEventListener('click', async () => {
+      const prompt = document.getElementById('q').value.trim();
+      if (!prompt) return;
+
+      const res = await fetch('/api/llm', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+
+      const data = await res.json();
+      document.getElementById('a').textContent = data.answer || data.error || "(no answer)";
+    });
+  </script>
+</body>
+</html>
