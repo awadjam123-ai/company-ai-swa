@@ -2,24 +2,20 @@ name: Azure Static Web Apps CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
     types: [opened, synchronize, reopened, closed]
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build_and_deploy_job:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Force Oryx/Functions to build with Node 20 (supported by Azure Functions v4)
       - name: Force Oryx Node 20
         run: echo "ORYX_NODE_VERSION=20" >> $GITHUB_ENV
 
@@ -29,10 +25,6 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-
-          # Frontend at repo root (static files)
+          action: upload
           app_location: "/"
-
-          # Functions API path
           api_location: "api"
