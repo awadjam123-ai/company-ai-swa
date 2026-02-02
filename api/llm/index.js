@@ -1,4 +1,6 @@
-// File: api/llm/index.js  (classic Functions model with function.json)
+// Classic Azure Functions model (function.json + CommonJS).
+// Always returns JSON, even on errors.
+
 module.exports = async function (context, req) {
   const requestId = Math.random().toString(16).slice(2);
 
@@ -10,7 +12,7 @@ module.exports = async function (context, req) {
       return respond(context, 400, { error: 'Missing prompt', id: requestId });
     }
 
-    // TODO: Replace with a real LLM call later.
+    // Replace this with a real LLM call later. Echo ensures end-to-end works.
     const answer = `You said: ${prompt}`;
 
     return respond(context, 200, { answer, id: requestId });
@@ -25,7 +27,6 @@ module.exports = async function (context, req) {
 };
 
 function getBody(req) {
-  // Functions runtime usually parses JSON into req.body if content-type is application/json.
   if (req.body && typeof req.body === 'object') return req.body;
   try {
     if (typeof req.rawBody === 'string' && req.rawBody.length) {
