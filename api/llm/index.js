@@ -1,5 +1,5 @@
 module.exports = async function (context, req) {
-  context.log('[lim] test handler hit');
+  context.log('[llm] test handler hit');
 
   return {
     // Functions v4 supports returning an object directly
