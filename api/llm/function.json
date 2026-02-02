@@ -8,7 +8,10 @@
       "methods": ["get", "post"],
       "route": "llm"
     },
-    { "type": "http", "direction": "out", "name": "$return" }
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
+    }
   ]
 }
-``
