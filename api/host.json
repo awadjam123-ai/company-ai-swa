@@ -1,3 +1,26 @@
 {
-  "version": "2.0"
+  "version": "2.0",
+  "extensions": {
+    "serviceBus": {
+      // Automatically marks the message as completed even if the function throws an exception
+      "autoCompleteMessages": true,
+      // Controls how many messages are processed concurrently
+      "maxConcurrentCalls": 1,
+      // Controls how long the function waits before timing out a message lock
+      "maxAutoLockRenewalDuration": "00:05:00"
+    }
+  },
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "maxTelemetryItemsPerSecond": 5
+      }
+    },
+    "logLevel": {
+      "Function": "Information",
+      "Host.Results": "Information",
+      "Host.Aggregator": "Information"
+    }
+  }
 }
