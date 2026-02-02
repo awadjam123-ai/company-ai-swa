@@ -19,64 +19,58 @@
   </main>
 
   <script>
-    document.getElementById('ask').addEventListener('click', async () => {
-      const prompt = document.getElementById('q').value.trim();
+    const input = document.getElementById('q');
+    const btn   = document.getElementById('ask');
+    const out   = document.getElementById('a');
+
+    function setLoading(b) {
+      btn.disabled  = b;
+      btn.textContent = b ? 'Asking…' : 'Ask';
+    }
+
+    function show(msg) {
+      out.textContent = typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+    }
+
+    async function ask() {
+      const prompt = input.value.trim();
       if (!prompt) return;
 
-      const res = await fetch('/api/llm', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ prompt })
-      });
+      setLoading(true);
+      show('Thinking…');
 
-      const data = await res.json();
-      document.getElementById('a').textContent = data.answer || data.error || "(no answer)";
-    });
-  <script>
-  const input = document.getElementById('q');
-  const btn = document.getElementById('ask');
-  const out = document.getElementById('a');
-
-  function setLoading(b) {
-    btn.disabled = b;
-    btn.textContent = b ? 'Asking…' : 'Ask';
-  }
-
-  async function ask() {
-    const prompt = input.value.trim();
-    if (!prompt) return;
-
-    setLoading(true);
-    out.textContent = 'Thinking…';
-    console.log('POST /api/llm', { prompt });
-
-    try {
-      const res = await fetch('/api/llm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
-
-      console.log('Status:', res.status);
-
-      let data;
       try {
-        data = await res.json();
-      } catch {
-        const txt = await res.text();
-        throw new Error(`Non-JSON response (status ${res.status}): ${txt.slice(0,200)}…`);
+        const res = await fetch('/api/llm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+
+        console.log('POST /api/llm → status', res.status);
+
+        // Only parse JSON if the server says so
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        if (!ct.includes('application/json')) {
+          const txt = await res.text().catch(() => '');
+          throw new Error(`Non-JSON response (status ${res.status}): ${txt.slice(0, 800)}…`);
+        }
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
+
+        show(data?.answer || '(no answer)');
+      } catch (e) {
+        console.error(e);
+        show('Error: ' + (e?.message || String(e)));
+      } finally {
+        setLoading(false);
       }
-
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      out.textContent = data.answer || '(no answer)';
-    } catch (e) {
-      console.error(e);
-      out.textContent = `Error: ${e.message}`;
-    } finally {
-      setLoading(false);
     }
-  }
 
-  btn.addEventListener('click', ask);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
-</script>
+    btn.addEventListener('click', ask);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
+  </script>
+</body>
+</html>
