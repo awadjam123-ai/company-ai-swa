@@ -1,17 +1,43 @@
-import { app } from "@azure/functions";
+// /.azure/api/llm/index.js  OR  /api/llm/index.js
 
-app.http("llm", {
-  methods: ["GET", "POST"],
-  authLevel: "anonymous",
-  handler: async (req) => {
-    const prompt =
-      req.method === "GET"
-        ? (req.query.get("q") || "").toString()
-        : ((await req.json().catch(() => ({}))).prompt || "");
+import { app } from '@azure/functions';
 
-    return {
-      status: 200,
-      jsonBody: { ok: true, message: "LLM function is alive.", echo: prompt }
-    };
+app.http('llm', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'llm',
+  handler: async (request, context) => {
+    try {
+      const body = await request.json();
+      const prompt = (body?.prompt || '').trim();
+
+      if (!prompt) {
+        return {
+          status: 400,
+          jsonBody: { error: "Missing prompt" }
+        };
+      }
+
+      // TODO — replace with your LLM call
+      const answer = "You said: " + prompt;
+
+      return {
+        status: 200,
+        jsonBody: { answer }
+      };
+
+    } catch (err) {
+      context.error("SERVER ERROR:", err);
+
+      // CRUCIAL: return valid JSON even on error
+      return {
+        status: 500,
+        jsonBody: {
+          error: "Server crashed processing request",
+          detail: String(err)
+        }
+      };
+    }
   }
 });
+``
