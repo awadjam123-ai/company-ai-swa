@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # *** Force Oryx to use Node 20 for Azure Functions v4 ***
+      # Force Oryx/Functions to build with Node 20 (supported by Azure Functions v4)
       - name: Force Oryx Node 20
         run: echo "ORYX_NODE_VERSION=20" >> $GITHUB_ENV
 
@@ -28,13 +28,11 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}   # for PR comments
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
 
-          # Frontend at repo root (already-built static files)
+          # Frontend at repo root (static files)
           app_location: "/"
-          # output_location: "/"   # optional
 
-          # Functions API folder
+          # Functions API path
           api_location: "api"
-
