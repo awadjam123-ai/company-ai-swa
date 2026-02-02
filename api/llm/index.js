@@ -1,65 +1,44 @@
-// File: api/llm/index.js
-import { app } from '@azure/functions';
+// File: api/llm/index.js  (classic Functions model with function.json)
+module.exports = async function (context, req) {
+  const requestId = Math.random().toString(16).slice(2);
 
-/**
- * Azure Functions v4 (ESM). Always returns JSON.
- * Works on Azure Static Web Apps (Node 18+).
- */
-app.http('llm', {
-  methods: ['POST'],
-  authLevel: 'anonymous',
-  route: 'llm',
-  handler: async (request, context) => {
-    const requestId = uuid();
+  try {
+    const body = getBody(req);
+    const prompt = String(body?.prompt ?? '').trim();
 
-    try {
-      // Parse JSON safely
-      const text = await request.text().catch(() => '');
-      let body = {};
-      try {
-        body = text ? JSON.parse(text) : {};
-      } catch (e) {
-        return json(400, { error: 'Invalid JSON body', id: requestId, detail: String(e) });
-      }
-
-      const prompt = String(body?.prompt ?? '').trim();
-      if (!prompt) {
-        return json(400, { error: 'Missing prompt', id: requestId });
-      }
-
-      // TODO: Replace this with your real LLM call.
-      // For now, a safe echo ensures end-to-end works.
-      const answer = `You said: ${prompt}`;
-
-      return json(200, { answer, id: requestId });
-    } catch (err) {
-      context.error('LLM handler error', err);
-      return json(500, {
-        error: 'Internal error while processing request',
-        id: requestId,
-        detail: String(err?.message || err)
-      });
+    if (!prompt) {
+      return respond(context, 400, { error: 'Missing prompt', id: requestId });
     }
-  }
-});
 
-function json(status, obj) {
-  return {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      // Optional: uncomment if you need explicit CORS for non-SWA hosting
-      // 'access-control-allow-origin': '*'
-    },
-    body: JSON.stringify(obj)
-  };
+    // TODO: Replace with a real LLM call later.
+    const answer = `You said: ${prompt}`;
+
+    return respond(context, 200, { answer, id: requestId });
+  } catch (err) {
+    context.log.error('LLM handler error', err);
+    return respond(context, 500, {
+      error: 'Internal error while processing request',
+      id: requestId,
+      detail: String(err?.message || err)
+    });
+  }
+};
+
+function getBody(req) {
+  // Functions runtime usually parses JSON into req.body if content-type is application/json.
+  if (req.body && typeof req.body === 'object') return req.body;
+  try {
+    if (typeof req.rawBody === 'string' && req.rawBody.length) {
+      return JSON.parse(req.rawBody);
+    }
+  } catch (_e) {}
+  return {};
 }
 
-function uuid() {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  // Fallback UUIDv4-ish
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
+function respond(context, status, obj) {
+  context.res = {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+    body: JSON.stringify(obj)
+  };
 }
