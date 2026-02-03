@@ -1,34 +1,34 @@
 module.exports = async function (context, req) {
   try {
-    context.log('llm: start');
+    context.log("ask function triggered");
 
-    // Safely read and validate the JSON body
     const body = req.body || {};
-    const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+    const prompt = body.prompt || "";
 
     if (!prompt) {
       return {
         status: 400,
-        headers: { 'content-type': 'application/json' },
-        body: { error: "Missing 'prompt' in request body." }
+        headers: { "content-type": "application/json" },
+        body: { error: "Missing 'prompt' in body" }
       };
     }
 
-    // TODO: call your model / service here and produce an answer
-    const answer = `Echo: ${prompt}`;
+    // TEMPORARY: mock LLM reply (replace with your real model later)
+    const answer = `You said: ${prompt}`;
 
-    context.log('llm: success');
     return {
       status: 200,
-      headers: { 'content-type': 'application/json' },
+      headers: { "content-type": "application/json" },
       body: { answer }
     };
+
   } catch (err) {
-    context.log.error('llm: exception', err);
+    context.log.error("ask function error", err);
+
     return {
       status: 500,
-      headers: { 'content-type': 'application/json' },
-      body: { error: 'Internal error', details: String(err && err.message || err) }
+      headers: { "content-type": "application/json" },
+      body: { error: "Internal server error", details: String(err) }
     };
   }
 };
