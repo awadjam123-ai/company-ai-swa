@@ -1,9 +1,18 @@
 // /api/llm/index.js
-const fetch = require("node-fetch");
+// Node 18+ on Azure Functions has global fetch. No need for require('node-fetch').
 
 module.exports = async function (context, req) {
   try {
-    context.log("llm function triggered");
+    context.log("llm function triggered", { method: req.method });
+
+    // Allow quick browser health check
+    if (req.method === 'GET') {
+      return {
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: { ok: true, route: "/api/llm", message: "LLM function is up" }
+      };
+    }
 
     const body = req.body || {};
     const prompt = body.prompt || "";
@@ -17,18 +26,22 @@ module.exports = async function (context, req) {
     }
 
     // --- Azure OpenAI Environment Variables ---
-    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;       // e.g. https://my-openai.openai.azure.com
+    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;       // e.g. https://<resource>.openai.azure.com
     const apiKey = process.env.AZURE_OPENAI_API_KEY;
     const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;   // e.g. gpt-4o-mini
 
     if (!endpoint || !apiKey || !deployment) {
-      throw new Error("Missing Azure OpenAI environment variables.");
+      context.log.error("Missing AOAI env vars", { endpoint: !!endpoint, apiKey: !!apiKey, deployment: !!deployment });
+      return {
+        status: 500,
+        headers: { "content-type": "application/json" },
+        body: { error: "Server not configured. Missing Azure OpenAI environment variables." }
+      };
     }
 
-    // --- Azure OpenAI Chat Completions Endpoint ---
+    // Chat Completions API (works with GPT‑4o‑mini, GPT‑3.5 etc. on AoAI)
     const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2024-02-15-preview`;
 
-    // --- Azure OpenAI Request ---
     const aoaiResponse = await fetch(url, {
       method: "POST",
       headers: {
@@ -46,16 +59,18 @@ module.exports = async function (context, req) {
     });
 
     if (!aoaiResponse.ok) {
-      const errorText = await aoaiResponse.text();
-      throw new Error("Azure OpenAI Error: " + errorText);
+      const errorText = await aoaiResponse.text().catch(() => "");
+      context.log.error("Azure OpenAI error response", { status: aoaiResponse.status, errorText });
+      return {
+        status: aoaiResponse.status,
+        headers: { "content-type": "application/json" },
+        body: { error: "Azure OpenAI request failed", details: errorText }
+      };
     }
 
     const result = await aoaiResponse.json();
-    const answer =
-      result?.choices?.[0]?.message?.content ||
-      "No response returned by Azure OpenAI.";
+    const answer = result?.choices?.[0]?.message?.content ?? "No response returned by Azure OpenAI.";
 
-    // --- Successful Response ---
     return {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -64,7 +79,6 @@ module.exports = async function (context, req) {
 
   } catch (err) {
     context.log.error("llm function error", err);
-
     return {
       status: 500,
       headers: { "content-type": "application/json" },
