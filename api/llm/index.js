@@ -1,88 +1,102 @@
-// /api/llm/index.js
-// Node 18+ on Azure Functions has global fetch. No need for require('node-fetch').
+// ----- Config: update these IDs if your HTML uses different ones -----
+const inputEl = document.getElementById('question');
+const buttonEl = document.getElementById('askBtn');
+const resultEl = document.getElementById('result');
 
-module.exports = async function (context, req) {
+// Optional: tweak request timeout (ms)
+const REQUEST_TIMEOUT_MS = 30000;
+
+// Utility to show messages
+function show(text, isError = false) {
+  if (!resultEl) return;
+  resultEl.textContent = text ?? '';
+  resultEl.style.color = isError ? '#ff6b6b' : '#e5e5e5';
+}
+
+// Fetch with timeout helper
+async function fetchWithTimeout(resource, options = {}) {
+  const { timeout = REQUEST_TIMEOUT_MS } = options;
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
   try {
-    context.log("llm function triggered", { method: req.method });
+    const response = await fetch(resource, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
 
-    // Allow quick browser health check
-    if (req.method === 'GET') {
-      return {
-        status: 200,
-        headers: { "content-type": "application/json" },
-        body: { ok: true, route: "/api/llm", message: "LLM function is up" }
-      };
-    }
+// Main ask function (called on button click or Enter key)
+async function ask() {
+  const question = (inputEl?.value || '').trim();
+  if (!question) {
+    show('Please enter a question.', true);
+    return;
+  }
 
-    const body = req.body || {};
-    const prompt = body.prompt || "";
+  show('Thinking…');
 
-    if (!prompt) {
-      return {
-        status: 400,
-        headers: { "content-type": "application/json" },
-        body: { error: "Missing 'prompt' in body" }
-      };
-    }
-
-    // --- Azure OpenAI Environment Variables ---
-    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;       // e.g. https://<resource>.openai.azure.com
-    const apiKey = process.env.AZURE_OPENAI_API_KEY;
-    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;   // e.g. gpt-4o-mini
-
-    if (!endpoint || !apiKey || !deployment) {
-      context.log.error("Missing AOAI env vars", { endpoint: !!endpoint, apiKey: !!apiKey, deployment: !!deployment });
-      return {
-        status: 500,
-        headers: { "content-type": "application/json" },
-        body: { error: "Server not configured. Missing Azure OpenAI environment variables." }
-      };
-    }
-
-    // Chat Completions API (works with GPT‑4o‑mini, GPT‑3.5 etc. on AoAI)
-    const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2024-02-15-preview`;
-
-    const aoaiResponse = await fetch(url, {
-      method: "POST",
+  try {
+    const res = await fetchWithTimeout('/api/llm', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey
+        'Content-Type': 'application/json',
+        // Add any custom headers your Function expects here
       },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: prompt }
-        ],
-        max_tokens: 600,
-        temperature: 0.7
-      })
+      body: JSON.stringify({ question })
     });
 
-    if (!aoaiResponse.ok) {
-      const errorText = await aoaiResponse.text().catch(() => "");
-      context.log.error("Azure OpenAI error response", { status: aoaiResponse.status, errorText });
-      return {
-        status: aoaiResponse.status,
-        headers: { "content-type": "application/json" },
-        body: { error: "Azure OpenAI request failed", details: errorText }
-      };
+    // Handle non-OK HTTP codes early
+    if (!res.ok) {
+      // Try to read error body as text for more context
+      const errText = await res.text().catch(() => '');
+      const msg = `Error: ${res.status} ${res.statusText}${errText ? ` — ${errText}` : ''}`;
+      show(msg, true);
+      return;
     }
 
-    const result = await aoaiResponse.json();
-    const answer = result?.choices?.[0]?.message?.content ?? "No response returned by Azure OpenAI.";
+    // Try JSON first; if it fails, fall back to text
+    let data;
+    const text = await res.text();
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Not JSON — show raw response
+      show(text);
+      return;
+    }
 
-    return {
-      status: 200,
-      headers: { "content-type": "application/json" },
-      body: { answer }
-    };
+    // Expecting { answer: "..." } but handle other shapes gracefully
+    const answer =
+      (data && (data.answer || data.message || data.result || data.output)) ??
+      JSON.stringify(data, null, 2);
 
+    show(answer);
   } catch (err) {
-    context.log.error("llm function error", err);
-    return {
-      status: 500,
-      headers: { "content-type": "application/json" },
-      body: { error: "Internal server error", details: String(err) }
-    };
+    if (err?.name === 'AbortError') {
+      show('Request timed out. Please try again.', true);
+    } else {
+      show(`Request failed: ${err?.message || err}`, true);
+    }
   }
-};
+}
+
+// Wire up UI events
+if (buttonEl) {
+  buttonEl.addEventListener('click', ask);
+}
+
+if (inputEl) {
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      ask();
+    }
+  });
+}
+
+// Optional: focus the input on load
+window.addEventListener('DOMContentLoaded', () => {
+  inputEl?.focus();
+});
